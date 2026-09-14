@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { X, UserPlus } from 'lucide-react';
+import { X, UserPlus, DollarSign } from 'lucide-react';
 
 export default function CreateGroupModal({ isOpen, onClose, onCreate }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [currency, setCurrency] = useState('$');
   const [participants, setParticipants] = useState(['Alice', 'Bob']);
 
   if (!isOpen) return null;
@@ -29,11 +30,13 @@ export default function CreateGroupModal({ isOpen, onClose, onCreate }) {
     onCreate({
       name: name.trim(),
       description: description.trim(),
+      currency,
       participant_names: filteredParticipants.length > 0 ? filteredParticipants : ['Alice', 'Bob']
     });
 
     setName('');
     setDescription('');
+    setCurrency('$');
     setParticipants(['Alice', 'Bob']);
     onClose();
   };
@@ -61,15 +64,32 @@ export default function CreateGroupModal({ isOpen, onClose, onCreate }) {
             />
           </div>
 
-          <div className="form-group">
-            <label>Description</label>
-            <input
-              type="text"
-              className="form-control"
-              placeholder="Short description..."
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem' }}>
+            <div className="form-group">
+              <label>Description</label>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Short description..."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+            <div className="form-group">
+              <label>Currency</label>
+              <select
+                className="form-control"
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                <option value="$">$ (USD)</option>
+                <option value="€">€ (EUR)</option>
+                <option value="£">£ (GBP)</option>
+                <option value="₹">₹ (INR)</option>
+                <option value="C$">C$ (CAD)</option>
+                <option value="A$">A$ (AUD)</option>
+              </select>
+            </div>
           </div>
 
           <div className="form-group">

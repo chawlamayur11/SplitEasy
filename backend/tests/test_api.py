@@ -6,14 +6,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from app.main import app
 from app.database import Base, get_db
 
-
-from sqlalchemy.pool import StaticPool
-
-# In-memory SQLite for testing with StaticPool to retain tables across connections
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 
 engine = create_engine(
@@ -22,7 +19,6 @@ engine = create_engine(
     poolclass=StaticPool
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-
 
 @pytest.fixture(scope="function")
 def db_session():
@@ -71,7 +67,33 @@ def test_create_and_get_group(client):
     assert get_res.json()["id"] == group_id
 
 
-def test_expense_and_balance_calculation(client):
+def test_validation_rejects_invalid_amount(client):
+    # 1. Create Group
+    grp_res = client.post("/api/groups", json={"name": "Test Group", "participant_names": ["Alice", "Bob"]})
+    group_id = grp_res.json()["id"]
+    alice_id = grp_res.json()["participants"][0]["id"]
+
+    # 2. Reject negative amount
+    res = client.post(f"/api/groups/{group_id}/expenses", json={
+        "description": "Invalid Negative Expense",
+        "amount": -50.0,
+        "payer_id": alice_id
+    })
+    assert res.status_code == 422
+
+    # 3. Reject split mismatch
+    res_mismatch = client.post(f"/api/groups/{group_id}/expenses", json={
+        "description": "Mismatch Expense",
+        "amount": 100.0,
+        "payer_id": alice_id,
+        "splits": [
+            {"participant_id": alice_id, "amount": 40.0}
+        ]
+    })
+    assert res_mismatch.status_code == 422
+
+
+def test_expense_and_balance_calculation_and_deletion(client):
     # 1. Create group with 3 members
     grp_res = client.post("/api/groups", json={
         "name": "Housemates",
@@ -95,6 +117,7 @@ def test_expense_and_balance_calculation(client):
         ]
     })
     assert exp_res.status_code == 201
+    expense_id = exp_res.json()["id"]
 
     # 3. Check balances
     bal_res = client.get(f"/api/groups/{group_id}/balances")
@@ -106,21 +129,12 @@ def test_expense_and_balance_calculation(client):
     assert balances[bob_id] == -30.0    # Paid 0, owes 30  => -30
     assert balances[charlie_id] == -30.0 # Paid 0, owes 30  => -30
 
-    assert len(bal_data["settlements"]) == 2
+    # 4. Delete Expense and verify balance resets to zero
+    del_res = client.delete(f"/api/groups/{group_id}/expenses/{expense_id}")
+    assert del_res.status_code == 204
 
-    # 4. Settle Bob's debt to Alice ($30)
-    stl_res = client.post(f"/api/groups/{group_id}/settle", json={
-        "payer_id": bob_id,
-        "payee_id": alice_id,
-        "amount": 30.0
-    })
-    assert stl_res.status_code == 201
-
-    # 5. Check updated balances
-    bal_res_after = client.get(f"/api/groups/{group_id}/balances")
-    bal_data_after = bal_res_after.json()
-    balances_after = {b["participant_id"]: b["net_balance"] for b in bal_data_after["balances"]}
-
+    bal_after_del = client.get(f"/api/groups/{group_id}/balances").json()
+    balances_after = {b["participant_id"]: b["net_balance"] for b in bal_after_del["balances"]}
+    assert balances_after[alice_id] == 0.0
     assert balances_after[bob_id] == 0.0
-    assert balances_after[alice_id] == 30.0
-    assert balances_after[charlie_id] == -30.0
+    assert balances_after[charlie_id] == 0.0

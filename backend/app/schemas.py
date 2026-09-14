@@ -1,6 +1,6 @@
 from typing import List, Optional
 from datetime import datetime
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 class ParticipantBase(BaseModel):
     name: str
@@ -32,7 +32,7 @@ class GroupResponse(GroupBase):
 
 class ExpenseSplitBase(BaseModel):
     participant_id: str
-    amount: float
+    amount: float = Field(gt=0, description="Amount owed by participant must be positive")
 
 class ExpenseSplitCreate(ExpenseSplitBase):
     pass
@@ -45,11 +45,21 @@ class ExpenseSplitResponse(ExpenseSplitBase):
 
 class ExpenseBase(BaseModel):
     description: str
-    amount: float
+    amount: float = Field(gt=0, description="Expense amount must be greater than zero")
     payer_id: str
 
 class ExpenseCreate(ExpenseBase):
     splits: Optional[List[ExpenseSplitCreate]] = []
+
+    @model_validator(mode="after")
+    def validate_splits_total(self):
+        if self.splits and len(self.splits) > 0:
+            total_splits = sum(s.amount for s in self.splits)
+            if abs(total_splits - self.amount) > 0.02:
+                raise ValueError(
+                    f"Sum of expense splits ({total_splits:.2f}) must equal total expense amount ({self.amount:.2f})"
+                )
+        return self
 
 class ExpenseResponse(ExpenseBase):
     id: str
@@ -62,10 +72,14 @@ class ExpenseResponse(ExpenseBase):
 class SettlementBase(BaseModel):
     payer_id: str
     payee_id: str
-    amount: float
+    amount: float = Field(gt=0, description="Settlement amount must be greater than zero")
 
 class SettlementCreate(SettlementBase):
-    pass
+    @model_validator(mode="after")
+    def validate_payer_payee(self):
+        if self.payer_id == self.payee_id:
+            raise ValueError("Payer and Payee cannot be the same person")
+        return self
 
 class SettlementResponse(SettlementBase):
     id: str

@@ -102,7 +102,7 @@ export default function App() {
                   </p>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: 'var(--glass-border)', paddingTop: '0.85rem' }}>
                     <span className="badge badge-indigo">
-                      {group.participants?.length || 0} Members
+                      {group.participants?.length || 0} Members ({group.currency || '$'})
                     </span>
                     <span style={{ fontSize: '0.85rem', color: '#818cf8', fontWeight: '600' }}>
                       View Details &rarr;

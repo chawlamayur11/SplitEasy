@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { fetchExpenses, fetchBalances, addExpense, recordSettlement, addParticipant } from '../api';
-import { Plus, Receipt, UserPlus, Handshake, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { fetchExpenses, fetchBalances, addExpense, recordSettlement, addParticipant, deleteExpense, deleteSettlement } from '../api';
+import { Plus, Receipt, UserPlus, Handshake, DollarSign, TrendingUp, TrendingDown, Trash2 } from 'lucide-react';
 import AddExpenseModal from './AddExpenseModal';
 import SettleModal from './SettleModal';
 
@@ -13,6 +13,8 @@ export default function GroupDetail({ group, onGroupUpdated }) {
   const [selectedSettlement, setSelectedSettlement] = useState(null);
   const [newMemberName, setNewMemberName] = useState('');
   const [showAddMember, setShowAddMember] = useState(false);
+
+  const curr = group?.currency || '$';
 
   const loadData = async () => {
     setLoading(true);
@@ -40,6 +42,13 @@ export default function GroupDetail({ group, onGroupUpdated }) {
     loadData();
   };
 
+  const handleDeleteExpense = async (expId, desc) => {
+    if (window.confirm(`Are you sure you want to delete "${desc}"?`)) {
+      await deleteExpense(group.id, expId);
+      loadData();
+    }
+  };
+
   const handleSettle = async (data) => {
     await recordSettlement(group.id, data);
     setShowSettle(false);
@@ -49,7 +58,7 @@ export default function GroupDetail({ group, onGroupUpdated }) {
   const handleAddMember = async (e) => {
     e.preventDefault();
     if (!newMemberName.trim()) return;
-    const added = await addParticipant(group.id, newMemberName.trim());
+    await addParticipant(group.id, newMemberName.trim());
     setNewMemberName('');
     setShowAddMember(false);
     if (onGroupUpdated) onGroupUpdated();
@@ -68,7 +77,7 @@ export default function GroupDetail({ group, onGroupUpdated }) {
             <p style={{ color: 'var(--text-muted)' }}>{group.description || 'No description provided'}</p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
               <span className="badge badge-indigo">{group.participants?.length || 0} Members</span>
-              <span className="badge badge-emerald">Total Spent: ${totalSpent.toFixed(2)}</span>
+              <span className="badge badge-emerald">Total Spent: {curr}{totalSpent.toFixed(2)}</span>
             </div>
           </div>
 
@@ -124,7 +133,7 @@ export default function GroupDetail({ group, onGroupUpdated }) {
                     {isPositive && <TrendingUp size={16} color="#10b981" />}
                     {isNegative && <TrendingDown size={16} color="#f43f5e" />}
                     <span className={isPositive ? 'badge badge-emerald' : isNegative ? 'badge badge-rose' : 'badge'}>
-                      {isPositive ? `+ $${b.net_balance.toFixed(2)}` : isNegative ? `- $${Math.abs(b.net_balance).toFixed(2)}` : '$0.00'}
+                      {isPositive ? `+ ${curr}${b.net_balance.toFixed(2)}` : isNegative ? `- ${curr}${Math.abs(b.net_balance).toFixed(2)}` : `${curr}0.00`}
                     </span>
                   </div>
                 </div>
@@ -146,7 +155,7 @@ export default function GroupDetail({ group, onGroupUpdated }) {
                     <span style={{ fontWeight: '700', color: '#10b981' }}>{s.payee_name}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <span style={{ fontWeight: '800', fontSize: '1.05rem', color: 'white' }}>${s.amount.toFixed(2)}</span>
+                    <span style={{ fontWeight: '800', fontSize: '1.05rem', color: 'white' }}>{curr}{s.amount.toFixed(2)}</span>
                     <button
                       className="btn btn-success"
                       style={{ padding: '0.35rem 0.65rem', fontSize: '0.8rem' }}
@@ -184,16 +193,25 @@ export default function GroupDetail({ group, onGroupUpdated }) {
                     <div>
                       <div style={{ fontWeight: '700', fontSize: '1rem' }}>{exp.description}</div>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        Paid by <strong style={{ color: '#818cf8' }}>{payerName}</strong>
+                        Paid by <strong style={{ color: '#818cf8' }}>{payerName}</strong> ({exp.splits?.length || 0} participants)
                       </div>
                     </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontWeight: '800', fontSize: '1.15rem', color: '#10b981' }}>
-                        ${exp.amount.toFixed(2)}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontWeight: '800', fontSize: '1.15rem', color: '#10b981' }}>
+                          {curr}{exp.amount.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                          {new Date(exp.created_at).toLocaleDateString()}
+                        </div>
                       </div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
-                        {new Date(exp.created_at).toLocaleDateString()}
-                      </div>
+                      <button
+                        style={{ background: 'none', border: 'none', color: '#f43f5e', cursor: 'pointer', opacity: 0.8, padding: '0.25rem' }}
+                        title="Delete expense"
+                        onClick={() => handleDeleteExpense(exp.id, exp.description)}
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
                 );

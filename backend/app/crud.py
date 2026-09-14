@@ -17,7 +17,6 @@ def create_group(db: Session, group: schemas.GroupCreate):
     db.commit()
     db.refresh(db_group)
 
-    # Add default or initial participants
     p_names = group.participant_names if group.participant_names else ["Alice", "Bob"]
     for name in p_names:
         if name.strip():
@@ -31,6 +30,14 @@ def create_group(db: Session, group: schemas.GroupCreate):
     db.refresh(db_group)
     return db_group
 
+def delete_group(db: Session, group_id: str):
+    db_group = get_group(db, group_id)
+    if db_group:
+        db.delete(db_group)
+        db.commit()
+        return True
+    return False
+
 def add_participant(db: Session, group_id: str, participant: schemas.ParticipantCreate):
     db_participant = models.Participant(
         group_id=group_id,
@@ -43,7 +50,7 @@ def add_participant(db: Session, group_id: str, participant: schemas.Participant
     return db_participant
 
 def get_expenses(db: Session, group_id: str):
-    return db.query(models.Expense).filter(models.Expense.group_id == group_id).all()
+    return db.query(models.Expense).filter(models.Expense.group_id == group_id).order_by(models.Expense.created_at.desc()).all()
 
 def create_expense(db: Session, group_id: str, expense: schemas.ExpenseCreate):
     db_expense = models.Expense(
@@ -57,7 +64,6 @@ def create_expense(db: Session, group_id: str, expense: schemas.ExpenseCreate):
     db.refresh(db_expense)
 
     # Process splits
-    participants = db.query(models.Participant).filter(models.Participant.group_id == group_id).all()
     if expense.splits and len(expense.splits) > 0:
         for sp in expense.splits:
             db_split = models.ExpenseSplit(
@@ -67,7 +73,8 @@ def create_expense(db: Session, group_id: str, expense: schemas.ExpenseCreate):
             )
             db.add(db_split)
     else:
-        # Equal split fallback
+        # Equal split fallback across all group participants
+        participants = db.query(models.Participant).filter(models.Participant.group_id == group_id).all()
         if len(participants) > 0:
             per_person = round(expense.amount / len(participants), 2)
             for p in participants:
@@ -81,6 +88,14 @@ def create_expense(db: Session, group_id: str, expense: schemas.ExpenseCreate):
     db.commit()
     db.refresh(db_expense)
     return db_expense
+
+def delete_expense(db: Session, expense_id: str):
+    db_expense = db.query(models.Expense).filter(models.Expense.id == expense_id).first()
+    if db_expense:
+        db.delete(db_expense)
+        db.commit()
+        return True
+    return False
 
 def calculate_group_balances(db: Session, group_id: str):
     group = get_group(db, group_id)
@@ -117,13 +132,13 @@ def calculate_group_balances(db: Session, group_id: str):
         for pid in net_balances
     ]
 
-    # Calculate minimal settlements using greedy algorithm
+    # Calculate minimal debt settlements using greedy algorithm
     creditors = []
     debtors = []
 
     for b in balance_list:
         if b.net_balance > 0.01:
-            creditors.push if hasattr(creditors, 'push') else creditors.append({'id': b.participant_id, 'name': b.name, 'amount': b.net_balance})
+            creditors.append({'id': b.participant_id, 'name': b.name, 'amount': b.net_balance})
         elif b.net_balance < -0.01:
             debtors.append({'id': b.participant_id, 'name': b.name, 'amount': -b.net_balance})
 
@@ -160,3 +175,11 @@ def create_settlement(db: Session, group_id: str, settlement: schemas.Settlement
     db.commit()
     db.refresh(db_settlement)
     return db_settlement
+
+def delete_settlement(db: Session, settlement_id: str):
+    db_settlement = db.query(models.Settlement).filter(models.Settlement.id == settlement_id).first()
+    if db_settlement:
+        db.delete(db_settlement)
+        db.commit()
+        return True
+    return False

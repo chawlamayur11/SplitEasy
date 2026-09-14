@@ -8,6 +8,7 @@ export default function SettleModal({ isOpen, onClose, group, initialSettlement,
 
   if (!isOpen || !group) return null;
 
+  const curr = group.currency || '$';
   const participants = group.participants || [];
 
   const handleSubmit = (e) => {
@@ -65,7 +66,7 @@ export default function SettleModal({ isOpen, onClose, group, initialSettlement,
           </div>
 
           <div className="form-group">
-            <label>Settlement Amount ($)</label>
+            <label>Settlement Amount ({curr})</label>
             <input
               type="number"
               step="0.01"

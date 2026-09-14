@@ -35,6 +35,13 @@ def get_groups(db: Session = Depends(database.get_db)):
 def create_group(group: schemas.GroupCreate, db: Session = Depends(database.get_db)):
     return crud.create_group(db, group)
 
+@app.delete("/api/groups/{group_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_group(group_id: str, db: Session = Depends(database.get_db)):
+    success = crud.delete_group(db, group_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Group not found")
+    return None
+
 @app.get("/api/groups/{group_id}", response_model=schemas.GroupResponse)
 def get_group(group_id: str, db: Session = Depends(database.get_db)):
     db_group = crud.get_group(db, group_id)
@@ -60,6 +67,16 @@ def create_expense(group_id: str, expense: schemas.ExpenseCreate, db: Session = 
         raise HTTPException(status_code=404, detail="Group not found")
     return crud.create_expense(db, group_id, expense)
 
+@app.delete("/api/groups/{group_id}/expenses/{expense_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_expense(group_id: str, expense_id: str, db: Session = Depends(database.get_db)):
+    db_group = crud.get_group(db, group_id)
+    if not db_group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    success = crud.delete_expense(db, expense_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    return None
+
 @app.get("/api/groups/{group_id}/balances", response_model=schemas.GroupBalancesResponse)
 def get_group_balances(group_id: str, db: Session = Depends(database.get_db)):
     db_group = crud.get_group(db, group_id)
@@ -73,3 +90,13 @@ def create_settlement(group_id: str, settlement: schemas.SettlementCreate, db: S
     if not db_group:
         raise HTTPException(status_code=404, detail="Group not found")
     return crud.create_settlement(db, group_id, settlement)
+
+@app.delete("/api/groups/{group_id}/settle/{settlement_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_settlement(group_id: str, settlement_id: str, db: Session = Depends(database.get_db)):
+    db_group = crud.get_group(db, group_id)
+    if not db_group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    success = crud.delete_settlement(db, settlement_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Settlement not found")
+    return None

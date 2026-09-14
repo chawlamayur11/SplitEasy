@@ -2,9 +2,8 @@
 // Environment configured to target local FastAPI backend, with fallback mock implementation
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
-let useMock = false; // Will switch dynamically if backend is unreachable
+let useMock = false;
 
-// Initial Mock Data
 let mockGroups = [
   {
     id: 'grp-1',
@@ -19,9 +18,9 @@ let mockGroups = [
   },
   {
     id: 'grp-2',
-    name: 'Roommates 🏠',
-    description: 'Monthly apartment utilities and groceries',
-    currency: '$',
+    name: 'Euro Trip 🇪🇺',
+    description: 'Backpacking through Europe',
+    currency: '€',
     participants: [
       { id: 'usr-1', name: 'Alice' },
       { id: 'usr-4', name: 'David' }
@@ -91,7 +90,7 @@ export async function createGroup(groupData) {
     id: `grp-${Date.now()}`,
     name: groupData.name,
     description: groupData.description || '',
-    currency: '$',
+    currency: groupData.currency || '$',
     participants: (groupData.participant_names || []).map((name, idx) => ({
       id: `usr-${Date.now()}-${idx}`,
       name
@@ -99,6 +98,21 @@ export async function createGroup(groupData) {
   };
   mockGroups.push(newGroup);
   return newGroup;
+}
+
+export async function deleteGroup(groupId) {
+  if (!useMock) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/groups/${groupId}`, { method: 'DELETE' });
+      if (res.ok) return true;
+    } catch (e) {
+      useMock = true;
+    }
+  }
+  mockGroups = mockGroups.filter(g => g.id !== groupId);
+  mockExpenses = mockExpenses.filter(e => e.group_id !== groupId);
+  mockSettlements = mockSettlements.filter(s => s.group_id !== groupId);
+  return true;
 }
 
 export async function addParticipant(groupId, name) {
@@ -162,6 +176,19 @@ export async function addExpense(groupId, expenseData) {
   return newExpense;
 }
 
+export async function deleteExpense(groupId, expenseId) {
+  if (!useMock) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/groups/${groupId}/expenses/${expenseId}`, { method: 'DELETE' });
+      if (res.ok) return true;
+    } catch (e) {
+      useMock = true;
+    }
+  }
+  mockExpenses = mockExpenses.filter(e => e.id !== expenseId);
+  return true;
+}
+
 export async function fetchBalances(groupId) {
   if (!useMock) {
     try {
@@ -172,14 +199,12 @@ export async function fetchBalances(groupId) {
     }
   }
 
-  // Fallback Mock balance calculation
   const group = mockGroups.find(g => g.id === groupId);
   if (!group) return { balances: [], settlements: [] };
 
   const net = {};
   group.participants.forEach(p => net[p.id] = 0);
 
-  // Add expenses
   const groupExpenses = mockExpenses.filter(e => e.group_id === groupId);
   groupExpenses.forEach(exp => {
     net[exp.payer_id] = (net[exp.payer_id] || 0) + exp.amount;
@@ -188,7 +213,6 @@ export async function fetchBalances(groupId) {
     });
   });
 
-  // Account for settlements
   mockSettlements.filter(s => s.group_id === groupId).forEach(s => {
     net[s.payer_id] = (net[s.payer_id] || 0) + s.amount;
     net[s.payee_id] = (net[s.payee_id] || 0) - s.amount;
@@ -200,7 +224,6 @@ export async function fetchBalances(groupId) {
     net_balance: net[p.id] || 0
   }));
 
-  // Debt minimization calculation
   const creditors = [];
   const debtors = [];
 
@@ -256,6 +279,19 @@ export async function recordSettlement(groupId, settlementData) {
   };
   mockSettlements.push(settlement);
   return settlement;
+}
+
+export async function deleteSettlement(groupId, settlementId) {
+  if (!useMock) {
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/groups/${groupId}/settle/${settlementId}`, { method: 'DELETE' });
+      if (res.ok) return true;
+    } catch (e) {
+      useMock = true;
+    }
+  }
+  mockSettlements = mockSettlements.filter(s => s.id !== settlementId);
+  return true;
 }
 
 export { BACKEND_URL };

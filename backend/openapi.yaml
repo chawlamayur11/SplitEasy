@@ -1,0 +1,147 @@
+openapi: 3.0.3
+info:
+  title: SplitEasy API
+  description: OpenAPI contract for SplitEasy Expense Splitter Backend
+  version: 1.0.0
+paths:
+  /api/groups:
+    get:
+      summary: List all groups
+      responses:
+        '200':
+          description: List of groups
+    post:
+      summary: Create a group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                participant_names:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Created group
+  /api/groups/{group_id}/participants:
+    post:
+      summary: Add participant to group
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+      responses:
+        '201':
+          description: Created participant
+  /api/groups/{group_id}/expenses:
+    get:
+      summary: List expenses for group
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of expenses
+    post:
+      summary: Create an expense
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - description
+                - amount
+                - payer_id
+              properties:
+                description:
+                  type: string
+                amount:
+                  type: number
+                payer_id:
+                  type: string
+                splits:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      participant_id:
+                        type: string
+                      amount:
+                        type: number
+      responses:
+        '201':
+          description: Created expense
+  /api/groups/{group_id}/balances:
+    get:
+      summary: Get calculated balances and optimal debt settlements
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Calculated balances and settlements
+  /api/groups/{group_id}/settle:
+    post:
+      summary: Record debt settlement
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - payer_id
+                - payee_id
+                - amount
+              properties:
+                payer_id:
+                  type: string
+                payee_id:
+                  type: string
+                amount:
+                  type: number
+      responses:
+        '201':
+          description: Recorded settlement
